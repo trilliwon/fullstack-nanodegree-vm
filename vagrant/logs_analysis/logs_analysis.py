@@ -24,7 +24,7 @@ def print_most_popular_three():
     c.execute(query)
     result = c.fetchall()
     for x in result:
-        print("{} -- {} views".format(x[0], x[1]))
+        print('"{}" -- {} views'.format(x[0], x[1]))
     db.close()
 
 
@@ -62,29 +62,29 @@ def print_more_than_one_percent_error_days():
     db = psycopg2.connect(database=DBNAME)
     c = db.cursor()
     query = """
-    select to_char(time, 'YYYY-MM-DD') as day,
-            count(*),
-            status
-    from log
-    group by day,
-             status;
+    WITH failed_req AS (SELECT to_char(TIME, 'YYYY-MM-DD') AS DAY,
+                        count(*) 
+                        FROM log
+                        WHERE status != '200 OK'
+                        GROUP BY DAY),
+         succeed_req AS (SELECT to_char(TIME, 'YYYY-MM-DD') AS DAY,
+                         count(*)
+                         FROM log
+                         WHERE status = '200 OK'
+                         GROUP BY DAY),
+         error_rate as (SELECT failed_req.day, 
+                        ((failed_req.count::float * 100) / 
+                         (succeed_req.count::float + failed_req.count::float)) 
+                        as error_rate
+                        FROM failed_req 
+                        JOIN succeed_req ON failed_req.day = succeed_req.day)
+    SELECT * 
+    FROM error_rate
+    WHERE error_rate > 1.0;
     """
     c.execute(query)
     result = c.fetchall()
-    successData = collections.Counter()
-    failureData = collections.Counter()
-    resultData = []
     for x in result:
-        if x[2] == '200 OK':
-            successData[x[0]] += x[1]
-        elif x[2] == '404 NOT FOUND':
-            failureData[x[0]] += x[1]
-    for key, successCount in successData.items():
-        failureCount = failureData[key]
-        errorRate = (failureCount / (failureCount + successCount)) * 100
-        if errorRate > 1.0:
-            resultData.append((key, errorRate))
-    for x in resultData:
         date = datetime.datetime.strptime(x[0], "%Y-%m-%d")
         formatedDateStr = date.strftime("%B %d, %Y")
         print(formatedDateStr, '--', "%.2f" % x[1] + '% errors')
