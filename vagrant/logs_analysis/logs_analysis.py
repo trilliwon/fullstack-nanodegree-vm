@@ -11,15 +11,20 @@ def print_most_popular_three():
     print("\n1. What are the most popular three articles of all time?\n")
     db = psycopg2.connect(database=DBNAME)
     c = db.cursor()
-    c.execute("""
-        select articles.title, count(*)
-        from log
-        join articles on ('/article/' || articles.slug) = log.path
-        group by articles.title, articles.author
-        order by count(articles.title) desc limit 3;""")
+    query = """
+    select articles.title,
+           count(*)
+    from log
+    join articles on ('/article/' || articles.slug) = log.path
+    group by articles.title,
+             articles.author
+    order by count(articles.title) desc
+    limit 3;
+    """
+    c.execute(query)
     result = c.fetchall()
     for x in result:
-        print('"' + x[0] + '" -- ', x[1], 'views')
+        print("{} -- {} views".format(x[0], x[1]))
     db.close()
 
 
@@ -28,19 +33,23 @@ def print_most_popular_author():
     print("\n2. Who are the most popular article authors of all time?\n")
     db = psycopg2.connect(database=DBNAME)
     c = db.cursor()
-    c.execute("""
-        select authors.name, sum(popular.count)
-        from authors
-        join
-            (select articles.author, articles.title, count(*)
-            from log
-            join articles on ('/article/' || articles.slug) = log.path
-            group by articles.title, articles.author
-            order by count(articles.title) desc)
-                as popular on authors.id = popular.author
-        group by authors.id
-        order by sum(popular.count) desc;
-        """)
+    query = """
+    select authors.name, sum(popular.count)
+    from authors
+    join
+        (select articles.author,
+                articles.title,
+                count(*)
+        from log
+        join articles on ('/article/' || articles.slug) = log.path
+        group by articles.title,
+                 articles.author
+        order by count(articles.title) desc)
+              as popular on authors.id = popular.author
+    group by authors.id
+    order by sum(popular.count) desc;
+    """
+    c.execute(query)
     result = c.fetchall()
     for x in result:
         print(x[0], ' -- ', x[1], 'views')
@@ -52,8 +61,15 @@ def print_more_than_one_percent_error_days():
     print("\n3. On which days did more than 1% of requests lead to errors?")
     db = psycopg2.connect(database=DBNAME)
     c = db.cursor()
-    c.execute("""select to_char(time, 'YYYY-MM-DD') as day, count(*), status
-        from log group by day, status;""")
+    query = """
+    select to_char(time, 'YYYY-MM-DD') as day,
+            count(*),
+            status
+    from log
+    group by day,
+             status;
+    """
+    c.execute(query)
     result = c.fetchall()
     successData = collections.Counter()
     failureData = collections.Counter()
